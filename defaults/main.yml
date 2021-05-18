@@ -1,0 +1,63 @@
+---
+# defaults file for inverso.confluence-docker
+
+confluence_data_dir              : '/var/confluence'
+confluence_servername            : 'confluence'
+confluence_version               : 'latest'
+#confluence_image_registry        : 'docker-public.nexusops.inverso.local'
+confluence_image_registry        : ''
+confluence_image_name            : 'atlassian/confluence-server'
+
+confluence_service_enabled       : 'yes'
+
+confluence_jvm_min_mem           : '2048m'
+confluence_jvm_max_mem           : '3072m'
+confluence_webappcontextpath     : '/confluence'
+
+confluence_proxy_configure       : False
+confluence_proxy_name            : 'corporate-proxy'
+confluence_proxy_port            : '8080'
+confluence_proxy_nonProxyHosts   : 'localhost\|127.0.0.1'
+
+confluence_tomcat_maxthreads     : '48'
+
+confluence_support_recommended_args: |
+  -Duser.timezone=Europe/Berlin
+  -Duser.region=DE
+  -Duser.country=DE
+  -Duser.language=de
+  -Dfile.encoding=UTF-8
+  -Djavax.net.ssl.trustStore=/var/atlassian/application-data/confluence/cacerts
+  -Dconfluence.context.path={{ confluence_webappcontextpath }}
+#  -Dhttp.proxyHost={{ confluence_proxy_name }} -Dhttp.proxyPort={{ confluence_proxy_port }} 
+#  -Dhttp.nonProxyHosts={{ confluence_proxy_nonProxyHosts }}
+#  -Dhttps.proxyHost={{ confluence_proxy_name }} -Dhttps.proxyPort={{ confluence_proxy_port }} 
+#  -Dhttps.nonProxyHosts={{ confluence_proxy_nonProxyHosts }}
+
+confluence_env_default:
+  LANG: 'de_DE.utf8'
+  LANGUAGE: 'de_DE.utf8'
+  LC_ALL: 'de_DE.utf8'
+  JVM_MINIMUM_MEMORY: '{{ confluence_jvm_min_mem }}'
+  JVM_MAXIMUM_MEMORY: '{{ confluence_jvm_max_mem }}'
+  JVM_SUPPORT_RECOMMENDED_ARGS: "{{ confluence_support_recommended_args | replace('\n',' ') }}"
+  ATL_PROXY_NAME: '{{ confluence_revproxy_name }}'
+  ATL_PROXY_PORT: '{{ confluence_revproxy_port }}'
+  ATL_TOMCAT_MAXTHREADS: '{{ confluence_tomcat_maxthreads | default(100) }}'
+  ATL_TOMCAT_SCHEME: '{{ confluence_revproxy_scheme }}'
+  ATL_TOMCAT_SECURE: '{{ confluence_revproxy_secure }}'
+  ATL_TOMCAT_CONTEXTPATH: '{{ confluence_webappcontextpath }}'
+
+confluence_env: '{{ confluence_env_default }}'
+
+confluence_volumes_default:
+  - '{{ confluence_data_dir }}:/var/atlassian/application-data/confluence'
+#  - '/etc/timezone:/etc/timezone:ro'
+
+confluence_volumes: '{{ confluence_volumes_default }}'
+
+
+confluence_revproxy_name         : '{{ confluence_servername }}'
+confluence_revproxy_port         : '443'
+confluence_revproxy_scheme       : 'https'
+confluence_revproxy_secure       : 'true'

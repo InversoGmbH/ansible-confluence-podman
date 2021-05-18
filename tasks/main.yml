@@ -1,0 +1,75 @@
+---
+# tasks file for inverso.confluence-docker
+
+- name: check required variables
+  assert:
+    that:
+      - confluence_image_name               | mandatory
+      - confluence_data_dir                 | mandatory
+      - confluence_version                  | mandatory
+      - confluence_jvm_min_mem              | mandatory
+      - confluence_jvm_max_mem              | mandatory
+      - confluence_support_recommended_args | mandatory
+      - confluence_servername               | mandatory
+      - confluence_service_enabled          in ['yes','no']
+      - confluence_image_pull               in ['yes','no']
+  tags: ['varcheck']
+
+- name: show config environment
+  debug:
+    var: _environment
+  vars:
+    _environment:
+      confluence_servername: '{{ confluence_servername }}'
+      confluence_image_name: '{{ confluence_image_name }}'
+      confluence_version: '{{ confluence_version }}'
+      confluence_data_dir: '{{ confluence_data_dir }}'
+      confluence_jvm_min_mem: '{{ confluence_jvm_min_mem }}'
+      confluence_jvm_max_mem: '{{ confluence_jvm_max_mem }}'
+      confluence_support_recommended_args: '{{ confluence_support_recommended_args }}'
+      confluence_service_enabled: '{{ confluence_service_enabled }}'
+      confluence_image_registry: "{{ confluence_image_registry | default('not set') }}"
+      confluence_webappcontextpath: '{{ confluence_webappcontextpath }}'
+      
+- name: create confluence data dir on docker host
+  file:
+    path: '{{ confluence_data_dir }}'
+    state: directory
+
+- name: ensure system cacerts file is also present for confluence
+  copy:
+    src: '/etc/pki/java/cacerts'
+    dest: '{{ confluence_data_dir }}/'
+    remote_src: yes
+
+- name: pull confluence image
+  podman_image:
+    name: "{{ confluence_image_registry }}{{ confluence_image_registry | ternary('/','') }}{{ confluence_image_name }}:{{ confluence_version }}"
+  when: confluence_image_pull in ['yes']
+
+# FIXME: try to limit exposed ports to 127.0.0.1 only
+- name: create confluence container
+  podman_container:
+    name: 'confluence'
+    hostname: 'confluence'
+    image: "{{ confluence_image_registry }}{{ confluence_image_registry | ternary('/','') }}{{ confluence_image_name }}:{{ confluence_version }}"
+    state: "{{ (confluence_service_enabled == 'yes') | ternary('started','stopped') }}"
+    restart_policy: on-failure
+    network_mode: host
+    volumes: '{{ confluence_volumes }}'
+    env: '{{ confluence_env }}'
+  register: _status_confluence_container
+
+- name: ensure systemd service file is generated
+  command: podman generate systemd -t 10 --restart-policy=always -n "confluence" -f
+  args:
+    chdir: /etc/systemd/system
+  register: _status_confluence_service_file
+  when: _status_confluence_container is changed
+
+- name: ensure confluence service is updated and enabled
+  systemd:
+    name: container-confluence
+    daemon_reload: yes
+    enabled: yes
+  when: _status_confluence_service_file is changed
