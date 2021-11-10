@@ -44,8 +44,10 @@
 
 - name: pull confluence image
   podman_image:
-    name: "{{ confluence_image_registry }}{{ confluence_image_registry | ternary('/','') }}{{ confluence_image_name }}:{{ confluence_version }}"
-  when: confluence_image_pull in ['yes']
+    name: "{{ confluence_image_registry }}{{ confluence_image_registry | ternary('/','') }}{{ confluence_image_name }}"
+    tag: "{{ confluence_version }}"
+    force: "{{ confluence_image_pull | default('no') }}"
+  register: _state_podman_image
 
 # FIXME: try to limit exposed ports to 127.0.0.1 only
 - name: create confluence container
@@ -54,11 +56,14 @@
     hostname: 'confluence'
     image: "{{ confluence_image_registry }}{{ confluence_image_registry | ternary('/','') }}{{ confluence_image_name }}:{{ confluence_version }}"
     state: "{{ (confluence_service_enabled == 'yes') | ternary('started','stopped') }}"
+    recreate: "{{ _recreate_container | default('no') }}"
     restart_policy: on-failure
     network_mode: host
     volumes: '{{ confluence_volumes }}'
     env: '{{ confluence_env }}'
   register: _status_confluence_container
+  vars:
+    _recreate_container: "{{ _state_podman_image is changed | ternary('yes','no') }}"
 
 - name: ensure systemd service file is generated
   command: podman generate systemd -t 10 --restart-policy=always -n "confluence" -f
